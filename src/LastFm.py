@@ -1,24 +1,21 @@
 import json
 import requests
 
-from config import LAST_FM_BASE_URL
 from src.Track import LastFmTrack
 from typing import List
-
-
-BASE_URL = LAST_FM_BASE_URL
 
 
 class LastFmClient:
 
     def __init__(self, api_key: str):
-        self.base_url = BASE_URL
+        self.base_url = "http://ws.audioscrobbler.com"
         self.api_key = api_key
-    
+
     def get_top_tracks(self, user: str) -> List[LastFmTrack]:
+        """ returns a list of user's top tracks """
         endpoint = "2.0/?method=user.gettoptracks"
         response = requests.post(
-            f"{BASE_URL}/{endpoint}&user={user}&api_key={self.api_key}&format=json")
+            f"{self.base_url}/{endpoint}&user={user}&api_key={self.api_key}&format=json")
         track_data = json.loads(response.text)["toptracks"]["track"]
         top_tracks: List[LastFmTrack] = []
 
@@ -30,18 +27,18 @@ class LastFmClient:
             top_tracks.append(top_track)
 
         return top_tracks
-    
 
     def get_top_tracks_in_date_range(
-            self, 
-            user: str, 
-            from_date: int, 
-            to_date: int, 
-            min_plays: int=0, 
+            self,
+            user: str,
+            from_date: int,
+            to_date: int,
+            min_plays: int=0,
             max_tracks: int=100) -> List[LastFmTrack]:
+        """ returns a list of user's top tracks for a given date range """
         endpoint = "2.0/?method=user.getweeklytrackchart"
         response = requests.post(
-            f"{BASE_URL}/{endpoint}&user={user}"
+            f"{self.base_url}/{endpoint}&user={user}"
             f"&api_key={self.api_key}&format=json&from={from_date}&to={to_date}")
         weekly_track_data = json.loads(response.text)["weeklytrackchart"]["track"]
 

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Tracks for Playlist</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>Top Tracks</h1>
+        <h3>User: {{ lastfm_username }}</h3>
+        <h4>Date Range: {{ from_date }} to {{ to_date }}</h4>
+        
+        <form method="POST" action="/playlist_created">
+            <input type="hidden" name="lastfm_username" value="{{ lastfm_username }}">
+            
+            <!-- Playlist Name Input -->
+            <div class="form-group">
+                <label for="playlist_name">Playlist Name:</label>
+                <input type="text" id="playlist_name" name="playlist_name" required>
+            </div>
+
+            <!-- Track Selection Checkboxes -->
+            <h4>Select tracks to add to playlist:</h4>
+            <div class="track-list">
+                {% for track in top_tracks %}
+                    <div class="track-item">
+                        <label>
+                            <input type="checkbox" name="selected_tracks" value="{{ track.artist }} || {{ track.title }}" checked>
+                            {{ track.title }} by {{ track.artist }}
+                        </label>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="submit-btn">Create Playlist</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

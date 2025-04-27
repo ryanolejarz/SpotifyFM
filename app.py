@@ -1,0 +1,137 @@
+import os
+
+from datetime import datetime
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from src.Spotify import SpotifyClient
+from src.LastFm import LastFmClient
+from src.Track import LastFmTrack
+from typing import List
+
+# load env variables from .env
+load_dotenv()
+
+# initialize FastAPI
+app = FastAPI()
+
+# set static files and templates directories
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# load Spotify and Last.fm credentials from env variables
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("REDIRECT_URI")
+SCOPE = os.getenv("SCOPE")
+LAST_FM_API_KEY = os.getenv("LAST_FM_API_KEY")
+
+# Initialize Spotify and Last.fm clients
+spotify_client = SpotifyClient(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, REDIRECT_URI, SCOPE)
+lastfm_client = LastFmClient(LAST_FM_API_KEY)
+
+# Main page to log in to Spotify
+@app.get("/")
+async def main(request: Request):
+    auth_url = spotify_client.api.auth_manager.get_authorize_url()
+    return templates.TemplateResponse(
+        "index.html", 
+        {"request": request, "auth_url": auth_url})
+
+@app.get("/callback")
+async def callback(request: Request, code: str):
+    # authenticate and fetch user info
+    spotify_client.api.auth_manager.get_access_token(code)
+    user = spotify_client.api.current_user()
+    return RedirectResponse(url=f"/authenticated?user={user['id']}")
+
+@app.get("/authenticated")
+async def authenticated(request: Request, user: str):
+    return templates.TemplateResponse(
+        "authenticated.html",
+        {"request": request, "user_id": user}
+    )
+
+@app.get("/lastfm_form")
+async def lastfm_form(request: Request):
+    return templates.TemplateResponse(
+        "lastfm_form.html", 
+        {"request": request}
+    )
+
+@app.post("/top_tracks")
+async def top_tracks(request: Request,
+                     lastfm_username: str = Form(...),
+                     from_date: str = Form(...),
+                     to_date: str = Form(...),
+                     max_tracks: int = Form(100)):  # Default max_tracks to 100
+    # Convert the date range to Unix timestamps
+    try:
+        from_date_timestamp = int(datetime.strptime(from_date, "%Y-%m-%d").timestamp())
+        to_date_timestamp = int(datetime.strptime(to_date, "%Y-%m-%d").timestamp())
+    except ValueError:
+        return {"error": "Invalid date format. Please use YYYY-MM-DD."}
+
+    # Fetch top tracks from Last.fm within the date range and max tracks limit
+    top_tracks = lastfm_client.get_top_tracks_in_date_range(
+        user=lastfm_username,
+        from_date=from_date_timestamp,
+        to_date=to_date_timestamp,
+        max_tracks=max_tracks
+    )
+
+    # convert tracks to LastFmTrack objects
+    lastfm_tracks = []
+    for track in top_tracks:
+        lastfm_track = LastFmTrack(track.title, track.artist)
+        lastfm_tracks.append(lastfm_track)
+
+        # search for the track on Spotify and add matching Spotify tracks
+        spotify_matches = spotify_client.search_song(track.artist, track.title)
+        if spotify_matches:  # Check if any matches were found
+            for spotify_track in spotify_matches:
+                lastfm_track.add_spotify_match(spotify_track.id)  # Add the match to the LastFmTrack
+        else:
+            # if no matches are found, log the information
+            print(f"No Spotify match found for {track.artist} - {track.title}")
+    
+    return templates.TemplateResponse(
+        "lastfm_top_tracks.html",
+        {"request": request, 
+         "top_tracks": lastfm_tracks,
+         "lastfm_username": lastfm_username, 
+         "from_date": from_date,
+         "to_date": to_date, 
+         "max_tracks": max_tracks}
+    )
+
+@app.post("/playlist_created")
+async def playlist_created(request: Request,
+                           playlist_name: str = Form(...),
+                           selected_tracks: List[str] = Form(...)):  # Get selected tracks
+    user = spotify_client.api.current_user()
+
+    # create a new playlist
+    playlist_id = spotify_client.create_playlist(user["id"], playlist_name)
+
+    # convert selected track strings back to SpotifyTrack objects
+    track_ids = []
+    for track_info in selected_tracks:
+        artist, title = track_info.split(" || ")
+        
+        # search for the song on Spotify
+        spotify_tracks = spotify_client.search_song(artist, title)
+
+        if spotify_tracks:
+            # if matches are found, add the top match to the playlist
+            track_ids.append(spotify_tracks[0].id)
+
+    # add tracks to the playlist
+    spotify_client.add_tracks_to_playlist(playlist_id, track_ids)
+
+    return templates.TemplateResponse(
+        "playlist_created.html",
+        {"request": request, "playlist_id": playlist_id, "playlist_name": playlist_name}
+    )
