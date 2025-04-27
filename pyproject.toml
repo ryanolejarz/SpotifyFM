@@ -1,0 +1,4 @@
+[tool.ruff]
+line-length = 88
+lint.select = ["E", "F", "W"]  # Which types of linting errors to check
+lint.ignore = ["E501"]         # Example: ignore long lines if you want

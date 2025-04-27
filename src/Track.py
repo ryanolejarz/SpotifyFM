@@ -20,12 +20,12 @@ class SpotifyTrack(Track):
 
 
 class LastFmTrack(Track):
-    def __init__(self, title: str, artist: str, spotify_matches: List[SpotifyTrack] = None):
+    def __init__(self, title: str, artist: str, spotify_matches: List[SpotifyTrack] = []):
         super().__init__(title, artist)
         self.spotify_matches = spotify_matches
 
     def __str__(self):
         return super().__str__()
-    
-    def add_spotify_match(self, track_id: List[str]) -> None:
+
+    def add_spotify_match(self, track_id: str) -> None:
         self.spotify_matches.append(track_id)
