@@ -46,10 +46,11 @@ class SpotifyClient:
 
         return songs
 
-    def create_playlist(self, username: str, playlist_name: str, public: bool = True) -> str:
+    def create_playlist(self, username: str, playlist_name: str, description: str, public: bool = True) -> str:
         playlist = self.api.user_playlist_create(
             user=self.api.user(username)['id'],
             name=playlist_name,
+            description=description,
             public=public)
         return playlist['id']
 

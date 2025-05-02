@@ -1,2 +1,3 @@
 # SpotifyFM
-Building Spotify playlists with last.fm data
+
+Generate Spotify playlists based on your personal last.fm charts.
